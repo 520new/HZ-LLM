@@ -53,18 +53,12 @@ class Lorentz(LorentzOri):
         return math.dist0(x, k=self.k, dim=dim, keepdim=keepdim)
 
     def cdist(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        # x = x.clone()
-        # x.narrow(-1, 0, 1).mul_(-1)
-        # return torch.sqrt(self.k) * acosh(-(x.matmul(y.transpose(-1, -2))) / self.k)
         return math.cdist(x, y, k=self.k)
-        # return -(x.matmul(y.transpose(-1, -2))) / self.k
 
     def sqdist(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        # return -2 - 2 * math.inner(x, y)
         return acosh(-math.inner(x, y)) ** 2
 
     def sqdist_multi(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        # return -2 - 2 * math.inner_multi(x, y)
         return acosh(-math.inner_multi(x, y)) ** 2
 
     def lorentz_to_klein(self, x):
@@ -132,7 +126,7 @@ class Lorentz(LorentzOri):
         keepdim=False,
         dim=-1,
     ) -> torch.Tensor:
-        # TODO: x argument for maintaining the support of optims
+
         if v is None:
             v = u
         return math.inner(u, v, dim=dim, keepdim=keepdim)
@@ -182,31 +176,6 @@ class Lorentz(LorentzOri):
     def random_normal(
         self, *size, mean=0, std=1, dtype=None, device=None
     ) -> "geoopt.ManifoldTensor":
-        r"""
-        Create a point on the manifold, measure is induced by Normal distribution on the tangent space of zero.
-
-        Parameters
-        ----------
-        size : shape
-            the desired shape
-        mean : float|tensor
-            mean value for the Normal distribution
-        std : float|tensor
-            std value for the Normal distribution
-        dtype: torch.dtype
-            target dtype for sample, if not None, should match Manifold dtype
-        device: torch.device
-            target device for sample, if not None, should match Manifold device
-
-        Returns
-        -------
-        ManifoldTensor
-            random points on Hyperboloid
-
-        Notes
-        -----
-        The device and dtype will match the device and dtype of the Manifold
-        """
         self._assert_check_shape(size2shape(*size), "x")
         if device is not None and device != self.k.device:
             raise ValueError(
@@ -224,25 +193,6 @@ class Lorentz(LorentzOri):
     def origin(
         self, *size, dtype=None, device=None, seed=42
     ) -> "geoopt.ManifoldTensor":
-        """
-        Zero point origin.
-
-        Parameters
-        ----------
-        size : shape
-            the desired shape
-        device : torch.device
-            the desired device
-        dtype : torch.dtype
-            the desired dtype
-        seed : int
-            ignored
-
-        Returns
-        -------
-        ManifoldTensor
-            zero point on the manifold
-        """
         if dtype is None:
             dtype = self.k.dtype
         if device is None:

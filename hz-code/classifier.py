@@ -8,8 +8,6 @@ import models
 import numpy as np
 
 class CLASSIFIER:
-    # train_Y is interger
-    # CLASSIFIER(syn_feature,util.map_label(syn_label,data.unseenclasses),data,data.unseenclasses.size(0),opt.cuda,opt.classifier_lr, 0.5, 25, opt.syn_num, False)
     def __init__(self, _train_X, _train_Y, data_loader, _nclass, _cuda, _lr=0.001, _beta1=0.5, _nepoch=1,
                  _batch_size=128, generalized=True, epoch=1):
         self.train_X = _train_X
@@ -17,16 +15,8 @@ class CLASSIFIER:
 
         self.test_seen_label = data_loader.test_seen_label
         self.test_seen_feature = data_loader.test_seen_feature
-        # self.test_seen_feature = torch.from_numpy(np.power(self.test_seen_feature[:, ].float().numpy(), 0.5))
-        # mu_seen, var_seen = vae.encoder(data_loader.test_seen_feature.cuda(), data_loader.attribute[self.test_seen_label].cuda())
-        # self.test_seen_feature = self.reparameterize(mu_seen, var_seen)
-
         self.test_unseen_label = data_loader.test_unseen_label
         self.test_unseen_feature = data_loader.test_unseen_feature
-        # self.test_unseen_feature = torch.from_numpy(np.power(self.test_unseen_feature[:, ].float().numpy(), 0.5))
-        # mu_unseen, var_unseen = vae.encoder(data_loader.test_unseen_feature.cuda(), data_loader.attribute[self.test_unseen_label].cuda())
-        # self.test_unseen_feature = self.reparameterize(mu_unseen, var_unseen)
-
         self.seenclasses = data_loader.seenclasses
         self.unseenclasses = data_loader.unseenclasses
 
@@ -46,7 +36,6 @@ class CLASSIFIER:
 
         self.lr = _lr
         self.beta1 = _beta1
-        # setup optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=_lr, betas=(_beta1, 0.999))
         self.epoch = epoch
 
@@ -80,10 +69,10 @@ class CLASSIFIER:
                 batch_input, batch_label = self.next_batch(self.batch_size)
                 self.input.copy_(batch_input)
                 self.label.copy_(batch_label)
-                inputv = Variable(self.input)  # fake_feature
-                labelv = Variable(self.label)  # fake_labels
+                inputv = Variable(self.input)
+                labelv = Variable(self.label)
                 output = self.model(inputv)
-                loss = self.criterion(output, labelv)  # 使用fake_unseen_feature和labels来训练分类器
+                loss = self.criterion(output, labelv)
                 loss.backward()
                 self.optimizer.step()
 
@@ -136,7 +125,6 @@ class CLASSIFIER:
                 all_output = torch.cat((all_output, output), 0)
             _, predicted_label[start:end] = torch.max(output.data, 1)
             start = end
-        # acc = self.compute_per_class_acc(util.map_label(test_label, target_classes), predicted_label, target_classes.size(0))
         acc = self.compute_per_class_acc_gzsl(test_label, predicted_label, target_classes)
         return acc, predicted_label, all_output
 
@@ -165,14 +153,13 @@ class CLASSIFIER:
 
         return seen_pred, seen_label, unseen_pred, unseen_label
 
-    # for gzsl
     def fit(self):
-        all_test_label = torch.cat((self.test_seen_label, self.test_unseen_label), 0)  # [4958+5685]
+        all_test_label = torch.cat((self.test_seen_label, self.test_unseen_label), 0)
         first_all_pred = None
 
         best_H = 0
         for epoch in range(self.nepoch):
-            for i in range(0, self.ntrain, self.batch_size):  # self.ntrain=22057, self.batch_size=300
+            for i in range(0, self.ntrain, self.batch_size):
                 self.model.zero_grad()
                 batch_input, batch_label = self.next_batch(self.batch_size)
                 self.input.copy_(batch_input)
@@ -200,23 +187,19 @@ class CLASSIFIER:
 
     def next_batch(self, batch_size):
         start = self.index_in_epoch
-        # shuffle the data at the first epoch
         if self.epochs_completed == 0 and start == 0:
             perm = torch.randperm(self.ntrain)
             self.train_X = self.train_X[perm]
             self.train_Y = self.train_Y[perm]
-        # the last batch
         if start + batch_size > self.ntrain:
             self.epochs_completed += 1
             rest_num_examples = self.ntrain - start
             if rest_num_examples > 0:
                 X_rest_part = self.train_X[start:self.ntrain]
                 Y_rest_part = self.train_Y[start:self.ntrain]
-            # shuffle the data
             perm = torch.randperm(self.ntrain)
             self.train_X = self.train_X[perm]
             self.train_Y = self.train_Y[perm]
-            # start next epoch
             start = 0
             self.index_in_epoch = batch_size - rest_num_examples
             end = self.index_in_epoch

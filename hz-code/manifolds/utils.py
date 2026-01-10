@@ -6,7 +6,7 @@ eps = 1e-8
 
 
 def sqrt(x: torch.Tensor) -> torch.Tensor:
-    x = clamp(x, min=1e-9)  # Smaller epsilon due to precision around x=0.
+    x = clamp(x, min=1e-9)
     return torch.sqrt(x)
 
 
@@ -30,10 +30,6 @@ def clamp(x: torch.Tensor, min: float = float("-inf"), max: float = float("+inf"
 
 
 class Acosh(torch.autograd.Function):
-    """
-    Numerically stable arccosh that never returns NaNs.
-    Returns acosh(x) = arccosh(x) = log(x + sqrt(max(x^2 - 1, eps))).
-    """
 
     @staticmethod
     def forward(ctx: Any, x: torch.Tensor) -> torch.Tensor:
@@ -46,16 +42,9 @@ class Acosh(torch.autograd.Function):
     @staticmethod
     def backward(ctx: Any, grad_output: torch.Tensor) -> torch.Tensor:
         z, = ctx.saved_tensors
-        # z_ = clamp(z, min=eps)
         z_ = z
         return grad_output / z_
 
 
 def acosh(x: torch.Tensor) -> torch.Tensor:
-    """
-    Numerically stable arccosh that never returns NaNs.
-
-    :param x: The input tensor.
-    :return: log(x + sqrt(max(x^2 - 1, eps))
-    """
     return Acosh.apply(x)

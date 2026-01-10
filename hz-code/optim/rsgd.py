@@ -6,32 +6,6 @@ __all__ = ["RiemannianSGD"]
 
 
 class RiemannianSGD(OptimMixin, torch.optim.Optimizer):
-    r"""
-    Riemannian Stochastic Gradient Descent with the same API as :class:`torch.optim.SGD`.
-
-    Parameters
-    ----------
-    params : iterable
-        iterable of parameters to optimize or dicts defining
-        parameter groups
-    lr : float
-        learning rate
-    momentum : float (optional)
-        momentum factor (default: 0)
-    weight_decay : float (optional)
-        weight decay (L2 penalty) (default: 0)
-    dampening : float (optional)
-        dampening for momentum (default: 0)
-    nesterov : bool (optional)
-        enables Nesterov momentum (default: False)
-
-    Other Parameters
-    ----------------
-    stabilize : int
-        Stabilize parameters if they are off-manifold due to numerical
-        reasons every ``stabilize`` steps (default: ``None`` -- no stabilize)
-    """
-
     def __init__(
         self,
         params,
@@ -83,8 +57,6 @@ class RiemannianSGD(OptimMixin, torch.optim.Optimizer):
                             "RiemannianSGD does not support sparse gradients, use SparseRiemannianSGD instead"
                         )
                     state = self.state[point]
-
-                    # State initialization
                     if len(state) == 0:
                         if momentum > 0:
                             state["momentum_buffer"] = grad.clone()
@@ -102,18 +74,13 @@ class RiemannianSGD(OptimMixin, torch.optim.Optimizer):
                             grad = grad.add_(momentum_buffer, alpha=momentum)
                         else:
                             grad = momentum_buffer
-                        # we have all the things projected
                         new_point, new_momentum_buffer = manifold.retr_transp(
                             point, -learning_rate * grad, momentum_buffer
                         )
-                        # momentum_buffer.set_(new_momentum_buffer)
                         momentum_buffer.copy_(new_momentum_buffer)
-                        # use copy only for user facing point
-                        # copy_or_set_(point, new_point)
                         point.copy_(new_point)
                     else:
                         new_point = manifold.retr(point, -learning_rate * grad)
-                        # copy_or_set_(point, new_point)
                         point.copy_(new_point)
                 if (
                     group["stabilize"] is not None
@@ -129,13 +96,11 @@ class RiemannianSGD(OptimMixin, torch.optim.Optimizer):
                 continue
             manifold = p.manifold
             momentum = group["momentum"]
-            # copy_or_set_(p, manifold.projx(p))
             p.copy_(manifold.projx(p))
             if momentum > 0:
                 param_state = self.state[p]
-                if not param_state:  # due to None grads
+                if not param_state:
                     continue
                 if "momentum_buffer" in param_state:
                     buf = param_state["momentum_buffer"]
-                    # buf.set_(manifold.proju(p, buf))
                     buf.copy_(manifold.proju(p, buf))

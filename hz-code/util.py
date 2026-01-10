@@ -21,18 +21,13 @@ class DATA_LOADER(object):
         label = matcontent['labels'].astype(int).squeeze() - 1
 
         matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/" + opt.class_embedding + "_splits.mat")
-
-        # numpy array index starts from 0, matlab starts from 1
         trainval_loc = matcontent['trainval_loc'].squeeze() - 1
         test_seen_loc = matcontent['test_seen_loc'].squeeze() - 1
         test_unseen_loc = matcontent['test_unseen_loc'].squeeze() - 1
 
         self.test_idx = np.array(test_seen_loc.tolist() + test_unseen_loc.tolist())
 
-        # achieve attributes of dataset
         self.attribute = torch.from_numpy(matcontent['att'].T).float()
-
-        #normlize the visual features
         scaler = preprocessing.MinMaxScaler()
         _train_feature = scaler.fit_transform(feature[trainval_loc])
         _test_seen_feature = scaler.transform(feature[test_seen_loc])
@@ -67,17 +62,12 @@ class DATA_LOADER(object):
 
         self.train_mapped_label = map_label(self.train_label, self.seenclasses)
 
-        # self.all_feature = torch.cat((self.train_feature, self.test_unseen_feature, self.test_seen_feature))
-        # self.both_feature = torch.cat((self.train_feature, self.test_unseen_feature))
-
     def next_batch(self, batch_size):
         idx = torch.randperm(self.ntrain)[0:batch_size]
         batch_feature = self.train_feature[idx]
         batch_label = self.train_label[idx]
         batch_att = self.attribute[batch_label]
         return batch_feature, batch_label, batch_att
-
-# 添加来自第一个项目的评估函数
 def recall_func(actual, predicted, topk):
     sum_recall = 0.0
     num_users = len(actual)

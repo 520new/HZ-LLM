@@ -6,10 +6,9 @@ import util
 from models import weights_init
 
 class CLASSIFIER:
-    # train_Y is interger
     def __init__(self, _train_X, _train_Y,  _nclass, _input_dim, _cuda, _lr=0.001, _beta1=0.5, _nepoch=20, _batch_size=100, pretrain_classifer=''):
-        self.train_X =  _train_X#[19832,2048]
-        self.train_Y = _train_Y #mapped labels 0-39
+        self.train_X =  _train_X
+        self.train_Y = _train_Y
         self.batch_size = _batch_size
         self.nepoch = _nepoch
         self.nclass = _nclass
@@ -19,12 +18,11 @@ class CLASSIFIER:
         self.model.apply(weights_init)
         self.criterion = nn.NLLLoss()
 
-        self.input = torch.FloatTensor(_batch_size, self.input_dim) #[100,2048]
-        self.label = torch.LongTensor(_batch_size) #[100,]
+        self.input = torch.FloatTensor(_batch_size, self.input_dim)
+        self.label = torch.LongTensor(_batch_size)
 
         self.lr = _lr
         self.beta1 = _beta1
-        # setup optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=_lr, betas=(_beta1, 0.999))
 
         if self.cuda:
@@ -35,7 +33,7 @@ class CLASSIFIER:
 
         self.index_in_epoch = 0
         self.epochs_completed = 0
-        self.ntrain = self.train_X.size()[0]#19832
+        self.ntrain = self.train_X.size()[0]
 
         if pretrain_classifer == '':
             self.fit()
@@ -60,23 +58,19 @@ class CLASSIFIER:
 
     def next_batch(self, batch_size):
         start = self.index_in_epoch
-        # shuffle the data at the first epoch
         if self.epochs_completed == 0 and start == 0:
             perm = torch.randperm(self.ntrain)
             self.train_X = self.train_X[perm]
             self.train_Y = self.train_Y[perm]
-        # the last batch
         if start + batch_size > self.ntrain:
             self.epochs_completed += 1
             rest_num_examples = self.ntrain - start
             if rest_num_examples > 0:
                 X_rest_part = self.train_X[start:self.ntrain]
                 Y_rest_part = self.train_Y[start:self.ntrain]
-            # shuffle the data
             perm = torch.randperm(self.ntrain)
             self.train_X = self.train_X[perm]
             self.train_Y = self.train_Y[perm]
-            # start next epoch
             start = 0
             self.index_in_epoch = batch_size - rest_num_examples
             end = self.index_in_epoch
@@ -89,10 +83,8 @@ class CLASSIFIER:
         else:
             self.index_in_epoch += batch_size
             end = self.index_in_epoch
-            # from index start to index end-1
             return self.train_X[start:end], self.train_Y[start:end]
 
-    # test_label is integer
     def val(self, test_X, test_label, target_classes):
         start = 0
         ntest = test_X.size()[0]

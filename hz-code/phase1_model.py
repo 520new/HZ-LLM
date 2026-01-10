@@ -20,7 +20,7 @@ class MoE(nn.Module):
         expert_outputs = torch.stack([expert(x) for expert in self.experts], dim=1)
         output = torch.sum(expert_outputs * weights.unsqueeze(2), dim=1)
         return output
-# 双曲VAE解码器
+
 class HyperbolicDecoder(nn.Module):
     def __init__(self, args):
         super(HyperbolicDecoder, self).__init__()
@@ -30,13 +30,10 @@ class HyperbolicDecoder(nn.Module):
         self.moe = MoE(input_dim=args.emb_dim, output_dim=args.emb_dim, num_experts=args.num_experts)
 
     def forward(self, z):
-        # z是双曲空间中的点 (通过指数映射得到)
-        # 先映射到切空间
         z_tangent = self.manifold.logmap0(z)
         h = F.relu(self.fc1(z_tangent))
         h = self.fc2(h)
         h = self.moe(h)
-        # 映射回双曲空间
         return self.manifold.expmap0(h, project=True)
 
 class HGCF(nn.Module):
@@ -46,7 +43,7 @@ class HGCF(nn.Module):
         self.manifold = Lorentz(max_norm=args.max_norm)
         self.num_users, self.num_items = args.num_users, args.num_items
         self.num_layers, self.margin = args.num_layers, args.margin
-        self.vae_beta = args.vae_beta  # 新增VAE损失权重参数
+        self.vae_beta = args.vae_beta
         emb_user_path = os.path.join(os.path.join('data', args.dataset), f'emb_user.pt')
         self.emb_user = nn.Embedding.from_pretrained(torch.load(emb_user_path), freeze=True)
         self.emb_user.weight = nn.Parameter(self.manifold.expmap0(self.emb_user.state_dict()['weight'], project=True))
@@ -57,34 +54,27 @@ class HGCF(nn.Module):
         self.emb_item.weight = ManifoldParameter(self.emb_item.weight, self.manifold, False)
         self.transform = MoE(input_dim=self.emb_user.weight.size(1), output_dim=args.emb_dim,
                              num_experts=args.num_experts).to(self.device)
-        # 新增双曲VAE组件
-        self.vae_mu = nn.Linear(args.emb_dim, args.emb_dim)  # 均值映射 (切空间)
-        self.vae_logvar = nn.Linear(args.emb_dim, args.emb_dim)  # 方差映射 (切空间)
-        self.decoder = HyperbolicDecoder(args)  # 双曲解码器
+        self.vae_mu = nn.Linear(args.emb_dim, args.emb_dim)
+        self.vae_logvar = nn.Linear(args.emb_dim, args.emb_dim)
+        self.decoder = HyperbolicDecoder(args)
 
         def reparameterize(self, mu, logvar):
-            """双曲空间中的重参数化 trick"""
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
-            z_tangent = mu + eps * std  # 切空间中的采样
-            return self.manifold.expmap0(z_tangent, project=True)  # 映射到双曲空间
+            z_tangent = mu + eps * std
+            return self.manifold.expmap0(z_tangent, project=True)
 
     def forward(self, adj, triples):
         x_user, x_item = self.emb_user.weight, self.emb_item.weight
         t_user, t_item = self.manifold.logmap0(x_user), self.manifold.logmap0(x_item)
         t_user_item = torch.cat([t_user, t_item], dim=0)
         m_user_item = self.transform(t_user_item)
-
-        # VAE部分
         mu = self.vae_mu(m_user_item)
         logvar = self.vae_logvar(m_user_item)
-        z = self.reparameterize(mu, logvar)  # 双曲空间中的潜在变量
-        recon = self.decoder(z)  # 重构结果 (双曲空间)
-
-        # 计算重构损失 (双曲空间距离)
+        z = self.reparameterize(mu, logvar)
+        recon = self.decoder(z)
         recon_loss = torch.mean(self.manifold.sqdist(recon, self.manifold.expmap0(m_user_item)))
 
-        # 计算KL散度 (切空间中的正态分布KL)
         kl_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
         loss_user_item, out_user_item = self.margin_loss(m_user_item, adj, self.margin, triples)
